@@ -25,3 +25,17 @@ For more information, consult the offical Ring site: http://mmcgrana.github.com/
 Add the following dependency to your `project.clj` and do a `lein deps`.
 
     [org.signaut/ring-jetty7-adapter "0.3.11.4"]
+
+
+## Adding Java Servlets
+
+Servlet code taken from Maximilian Weber.
+
+More information and examples: https://github.com/maxweber/hello-cometd
+
+Adding a servlet to jetty example: 
+
+       (let [servlets [{:url-pattern "/orders/*"
+                        :servlet orders-servlet
+                        :load-on-startup 1}]"]
+          (run-jetty app {:port 8080 :servlets servlets}))

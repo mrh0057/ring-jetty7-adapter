@@ -4,7 +4,9 @@
            (org.eclipse.jetty.server Server Request Response)
            (org.eclipse.jetty.server.nio SelectChannelConnector)
            (org.eclipse.jetty.server.ssl SslSelectChannelConnector)
-           (javax.servlet.http HttpServletRequest HttpServletResponse))
+           (org.eclipse.jetty.servlet ServletContextHandler ServletHolder)
+           (javax.servlet.http HttpServletRequest HttpServletResponse)
+           (javax.servlet GenericServlet ServletException))
   (:require [ring.util.servlet :as servlet]))
 
 (defn- proxy-handler
@@ -48,6 +50,9 @@
 
 (defn ^Server run-jetty
   "Serve the given handler according to the options.
+
+Servlet code taken from Maximilian Weber. 
+
   Options:
     :configurator   - A function called with the Server instance.
     :port
@@ -58,14 +63,29 @@
     :keystore
     :key-password
     :truststore
-    :trust-password"
+    :trust-password
+    :servlets       - Additional servlets to register in the form
+                      [{:url-pattern \"/orders/*\"
+                        :servlet orders-servlet
+                        :load-on-startup 1}]"
   [handler options]
   (let [^Server s (create-server (dissoc options :configurator))]
     (when-let [configurator (:configurator options)]
       (configurator s))
-    (doto s
-      (.setHandler (proxy-handler handler))
-      (.start))
+    (let [context (ServletContextHandler. ServletContextHandler/SESSIONS)
+          handler-servlet (servlet/servlet handler)]
+      (do
+        (.setContextPath context "/")
+        (.addServlet context (ServletHolder. handler-servlet) "/*"))
+      (dorun
+       (map #(let [{:keys [url-pattern servlet load-on-startup]} %1
+                   holder (ServletHolder. servlet)]
+               (.setInitOrder holder load-on-startup)
+               (.addServlet context holder url-pattern))
+            (:servlets options)))
+      (doto s
+        (.setHandler context)
+        (.start)))
     (when (:join? options true)
       (.join s))
     s))
